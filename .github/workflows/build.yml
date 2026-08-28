@@ -33,13 +33,6 @@ jobs:
           mkdir -p project
           unzip -q Masroufi_AutoBank_v4_FINAL.zip -d project
 
-      - name: Fix Kotlin JVM target
-        run: |
-          find project -name "gradle.properties" -type f -exec sh -c 'echo "kotlin.jvm.target.validation.mode=warning" >> "$1"' _ {} \;
-          if ! find project -name "gradle.properties" -type f | grep -q .; then
-            echo "kotlin.jvm.target.validation.mode=warning" > project/gradle.properties
-          fi
-
       - name: Find Gradle project
         run: |
           echo "Searching for Gradle project..."
@@ -71,13 +64,26 @@ jobs:
         if: steps.gradle.outputs.use_wrapper == 'false'
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Fix JVM target compatibility
+        working-directory: ${{ steps.gradle.outputs.project_dir || 'project' }}
+        run: |
+          cat > fix-jvm.gradle <<'EOF'
+          allprojects {
+              tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+                  kotlinOptions {
+                      jvmTarget = "1.8"
+                  }
+              }
+          }
+          EOF
+
       - name: Build APK
         working-directory: ${{ steps.gradle.outputs.project_dir || 'project' }}
         run: |
           if [ "${{ steps.gradle.outputs.use_wrapper }}" = "true" ]; then
-            ./gradlew assembleDebug --stacktrace
+            ./gradlew assembleDebug --stacktrace -I fix-jvm.gradle
           else
-            gradle assembleDebug --stacktrace
+            gradle assembleDebug --stacktrace -I fix-jvm.gradle
           fi
 
       - name: Find APK
