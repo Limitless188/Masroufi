@@ -21,7 +21,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Install SDK packages
         run: |
@@ -34,22 +34,25 @@ jobs:
 
       - name: Find Gradle project
         run: |
-          find project -name gradlew -type f -exec chmod +x {} \;
+          echo "Searching for Gradle project..."
+          find project -name "build.gradle" -o -name "build.gradle.kts"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.10'
 
       - name: Build APK
-        working-directory: project
         run: |
-          GRADLEW=$(find . -name gradlew -type f | head -1)
-          if [ -z "$GRADLEW" ]; then
-            echo "gradlew not found"
-            exit 1
-          fi
-          DIR=$(dirname "$GRADLEW")
-          cd "$DIR"
-          ./gradlew assembleDebug --no-daemon
+          PROJECT_DIR=$(find project -name "settings.gradle" -o -name "settings.gradle.kts" | head -1 | xargs dirname)
+          echo "Project directory: $PROJECT_DIR"
+          gradle -p "$PROJECT_DIR" assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Masroufi-APK
-          path: project/**/build/outputs/apk/**/*.apk
+          path: |
+            project/**/build/outputs/apk/debug/*.apk
+            project/**/build/outputs/apk/release/*.apk
+          if-no-files-found: error
