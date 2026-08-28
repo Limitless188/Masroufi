@@ -33,59 +33,15 @@ jobs:
           mkdir -p project
           unzip -q Masroufi_AutoBank_v4_FINAL.zip -d project
 
-      - name: Find Gradle project
-        run: |
-          echo "Searching for Gradle project..."
-          find project -maxdepth 5 -type f \( \
-            -name "settings.gradle" -o \
-            -name "settings.gradle.kts" -o \
-            -name "build.gradle" -o \
-            -name "build.gradle.kts" \
-          \) -print
-
-      - name: Find Gradle wrapper
-        id: gradle
-        run: |
-          GRADLEW=$(find project -type f -name gradlew | head -1 || true)
-
-          if [ -n "$GRADLEW" ]; then
-            echo "Found Gradle wrapper: $GRADLEW"
-            chmod +x "$GRADLEW"
-
-            PROJECT_DIR=$(dirname "$GRADLEW")
-            echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
-            echo "use_wrapper=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Gradle wrapper not found."
-            echo "use_wrapper=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Setup Gradle
-        if: steps.gradle.outputs.use_wrapper == 'false'
+      - name: Setup Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
-
-      - name: Fix Java Kotlin JVM target
-        working-directory: ${{ steps.gradle.outputs.project_dir || 'project' }}
-        run: |
-          cat > fix-jvm.gradle <<'EOF'
-          import org.gradle.api.tasks.compile.JavaCompile
-
-          allprojects {
-              tasks.withType(JavaCompile).configureEach {
-                  sourceCompatibility = "17"
-                  targetCompatibility = "17"
-              }
-          }
-          EOF
+        with:
+          gradle-version: '8.10.2'
 
       - name: Build APK
-        working-directory: ${{ steps.gradle.outputs.project_dir || 'project' }}
+        working-directory: project
         run: |
-          if [ "${{ steps.gradle.outputs.use_wrapper }}" = "true" ]; then
-            ./gradlew assembleDebug --stacktrace -I fix-jvm.gradle
-          else
-            gradle assembleDebug --stacktrace -I fix-jvm.gradle
-          fi
+          gradle :app:assembleDebug --no-daemon --stacktrace
 
       - name: Find APK
         run: |
@@ -96,5 +52,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Masroufi-APK
-          path: project/**/build/outputs/apk/**/*.apk
+          path: project/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
