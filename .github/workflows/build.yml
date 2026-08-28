@@ -21,7 +21,7 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
       - name: Install SDK packages
         run: |
@@ -30,29 +30,57 @@ jobs:
 
       - name: Extract project
         run: |
+          mkdir -p project
           unzip -q Masroufi_AutoBank_v4_FINAL.zip -d project
 
       - name: Find Gradle project
         run: |
           echo "Searching for Gradle project..."
-          find project -name "build.gradle" -o -name "build.gradle.kts"
+          find project -maxdepth 5 -type f \( \
+            -name "settings.gradle" -o \
+            -name "settings.gradle.kts" -o \
+            -name "build.gradle" -o \
+            -name "build.gradle.kts" \
+          \) -print
+
+      - name: Find Gradle wrapper
+        id: gradle
+        run: |
+          GRADLEW=$(find project -type f -name gradlew | head -1 || true)
+
+          if [ -n "$GRADLEW" ]; then
+            echo "Found Gradle wrapper: $GRADLEW"
+            chmod +x "$GRADLEW"
+
+            PROJECT_DIR=$(dirname "$GRADLEW")
+            echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+            echo "use_wrapper=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Gradle wrapper not found."
+            echo "use_wrapper=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: '8.10'
+        if: steps.gradle.outputs.use_wrapper == 'false'
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build APK
+        working-directory: ${{ steps.gradle.outputs.project_dir || 'project' }}
         run: |
-          PROJECT_DIR=$(find project -name "settings.gradle" -o -name "settings.gradle.kts" | head -1 | xargs dirname)
-          echo "Project directory: $PROJECT_DIR"
-          gradle -p "$PROJECT_DIR" assembleDebug --stacktrace
+          if [ "${{ steps.gradle.outputs.use_wrapper }}" = "true" ]; then
+            ./gradlew assembleDebug --stacktrace
+          else
+            gradle assembleDebug --stacktrace
+          fi
+
+      - name: Find APK
+        run: |
+          echo "Searching for APK..."
+          find project -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Masroufi-APK
-          path: |
-            project/**/build/outputs/apk/debug/*.apk
-            project/**/build/outputs/apk/release/*.apk
+          path: project/**/build/outputs/apk/**/*.apk
           if-no-files-found: error
