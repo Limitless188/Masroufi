@@ -33,6 +33,13 @@ jobs:
           mkdir -p project
           unzip -q Masroufi_AutoBank_v4_FINAL.zip -d project
 
+      - name: Fix Kotlin JVM target
+        run: |
+          find project -name "gradle.properties" -type f -exec sh -c 'echo "kotlin.jvm.target.validation.mode=warning" >> "$1"' _ {} \;
+          if ! find project -name "gradle.properties" -type f | grep -q .; then
+            echo "kotlin.jvm.target.validation.mode=warning" > project/gradle.properties
+          fi
+
       - name: Find Gradle project
         run: |
           echo "Searching for Gradle project..."
