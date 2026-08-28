@@ -38,16 +38,10 @@ jobs:
         run: |
           unzip -q Masroufi_GitHub_APK.zip -d project
 
-      - name: Fix Java version
-        working-directory: project
-        run: |
-          find . -name "*.gradle" -type f -exec sed -i 's/JavaVersion.VERSION_1_8/JavaVersion.VERSION_17/g' {} +
-          find . -name "*.gradle" -type f -exec sed -i 's/jvmTarget *= *["'\'']1\.8["'\'']/jvmTarget = "17"/g' {} +
-
       - name: Build APK
         working-directory: project
         run: |
-          gradle :app:assembleDebug --no-daemon
+          gradle app:assembleDebug --no-daemon -Pkotlin.jvm.target.validation.mode=warning
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
